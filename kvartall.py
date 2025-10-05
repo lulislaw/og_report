@@ -1,7 +1,10 @@
 import pandas as pd
 import os
 
-def make_kvartal_report_excel(file,date, morning):
+from xlsx_functions import update_ais_data
+
+
+def make_kvartal_report_excel(file,date):
     population_moscow = {
         "ЦАО": 774430,
         "САО": 1217909,
@@ -16,13 +19,8 @@ def make_kvartal_report_excel(file,date, morning):
         "ТиНАО": 762831,
         "Общий итог": 13149803
     }
-    time_morning = "8:00"
-    time_evening = "17:00"
-    if morning:
-        time = time_morning
-    else:
-        time = time_evening
-    date_text = f"{date} на {time}"
+
+    date_text = f"{date}"
     dist_path = ""
     tmp_files_img_path = os.path.join(dist_path, "reports", f"{date_text}", "tmp_files", "img").replace(":", ".")
     tmp_files_path = os.path.join(dist_path, "reports", f"{date_text}", "tmp_files").replace(":", ".")
@@ -33,10 +31,13 @@ def make_kvartal_report_excel(file,date, morning):
         if not os.path.exists(path):
             print(f"Создание директории: {path}")
             os.makedirs(path, exist_ok=True)
-    excel_path = reports_path
+    excel_path = f"{reports_path}/kvartal.xlsx"
     order = ["ЦАО", "САО", "СВАО", "ВАО", "ЮВАО", "ЮАО", "ЮЗАО", "ЗАО", "СЗАО", "ЗелАО", "ТиНАО"]
-    csv_path = file
-    df = pd.read_csv(csv_path, low_memory=False)
+    if ".xlsx" in file:
+        df = pd.read_excel(file)
+    else:
+        df = pd.read_csv(file, low_memory=False)
+    df = update_ais_data(df)
     df["Округ"] = df["Округ"].astype(str).str.strip()
     df = df[~df["Округ"].isin(["", "nan", "None"])]
 
@@ -402,5 +403,4 @@ def make_kvartal_report_excel(file,date, morning):
     unique_addresses_mkd = df_mkd["Адрес объекта"].nunique()
     unique_addresses_other = df_other["Адрес объекта"].nunique()
 
-    print("Количество уникальных адресов (МКД):", unique_addresses_mkd)
-    print("Количество уникальных адресов (Прочие):", unique_addresses_other)
+    return [("Количество уникальных адресов (Прочие):", unique_addresses_other), ("Количество уникальных адресов (МКД):", unique_addresses_mkd)]

@@ -10,7 +10,7 @@ import subprocess
 import textwrap
 import pandas as pd
 from tkinter import ttk
-
+from kvartall import make_kvartal_report_excel
 from daily_report_full import make_daily_full_presentation
 from main_full import make_main_full_presentation
 from month_report import make_month_report
@@ -65,11 +65,7 @@ def generate_report_halfdaily():
         date_str = date_entry.get_date().strftime("%d.%m.%Y")
         morning = morning_var.get()
         fix_oiv = fix_oiv_var.get()
-        summer = True
-        # summer = summer_var.get()
         previous_period_data = {district: int(entry_vars[district].get() or 0) for district in entry_vars}
-        if not summer:
-            edc_file = None
         report_lines = make_main_full_presentation(ais_file, previous_period_data, date_str, morning, fix_oiv)
         for line in report_lines:
             print(line)
@@ -123,7 +119,26 @@ def generate_report_month():
     def report_task():
         ais_file = ais_file_entry.get()
         date_str = date_entry.get_date().strftime("%d.%m.%Y")
-        report_lines = make_month_report(ais_file, date_str, False)
+        mid_index = int(apply_mid_index())
+        print(mid_index)
+        report_lines = make_month_report(ais_file, date_str, mid_index=mid_index)
+        for line in report_lines:
+            print(line)
+        open_folder_button.pack(pady=10)
+        print("Конец" + "\n" * 5)
+
+    threading.Thread(target=report_task, daemon=True).start()
+
+
+def generate_report_kvartal():
+    report_output.delete("1.0", "end")
+    save_tree_to_excel(True)
+    print("Процесс запущен...")
+
+    def report_task():
+        ais_file = ais_file_entry.get()
+        date_str = date_entry.get_date().strftime("%d.%m.%Y")
+        report_lines = make_kvartal_report_excel(ais_file, date_str)
         for line in report_lines:
             print(line)
         open_folder_button.pack(pady=10)
@@ -135,8 +150,9 @@ def generate_report_month():
 def update_buttons_visibility():
     report_type = report_type_var.get()
     all_buttons = [
-        halfdaily_btn, weekly_btn, month_btn
+        halfdaily_btn, weekly_btn, month_btn, kvartal_btn
     ]
+    midind_frame.pack_forget()
     for btn in all_buttons:
         btn.pack_forget()
     if report_type == "Полусуточный":
@@ -148,12 +164,13 @@ def update_buttons_visibility():
     elif report_type == "Месячный":
         month_btn.pack(side="right", padx=20)
         morning_report_frame.pack_forget()
+        midind_frame.pack()
+    elif report_type == "Квартальный":
+        kvartal_btn.pack(side="right", padx=20)
+        morning_report_frame.pack_forget()
 
 
-# ========= ЛОГИКА ДЛЯ TREEVIEW С ЧЕКБОКСАМИ =========
-
-# Храним состояние чекбоксов здесь:
-check_states = {}  # словарь: row_id -> bool
+check_states = {}
 original_data = {}
 
 
@@ -283,6 +300,31 @@ def save_tree_to_excel(only_checked=False):
     table_frame.pack_forget()
 
 
+def only_digits(new_value: str) -> bool:
+    # Разрешаем пустую строку (чтобы можно было удалить), либо только цифры
+    return new_value.isdigit() or new_value == ""
+
+
+def apply_mid_index(event=None):
+    raw = mid_index_var.get().strip()
+    if raw == "":
+        messagebox.showwarning("Внимание", "Введите число для mid_index.")
+        mid_index_entry.focus_set()
+        return
+
+    try:
+        val = int(raw)
+    except ValueError:
+        messagebox.showerror("Ошибка", "mid_index должен быть целым числом.")
+        return
+
+    # Ограничим диапазон, чтобы не вылететь за пределы
+    if val < 0 or val > 100:
+        messagebox.showwarning("Внимание", f"mid_index должен быть в диапазоне 0..{100}.")
+        return
+    return raw
+
+
 # ============ ОСНОВНОЕ ОКНО ============
 
 root = TkinterDnD.Tk()
@@ -311,7 +353,7 @@ report_type_label.pack(side="left", padx=5)
 report_type_var = ctk.StringVar(value="Полусуточный")
 report_type_combobox = ctk.CTkComboBox(
     report_type_frame,
-    values=["Полусуточный", "Суточный", "Недельный", "Месячный"],
+    values=["Полусуточный", "Недельный", "Месячный", "Квартальный"],
     # , "Недельный", "Месячный"],
     variable=report_type_var,
     command=lambda choice: update_buttons_visibility()
@@ -336,8 +378,6 @@ ais_file_entry.dnd_bind("<<Drop>>", lambda e: drop_file(e, ais_file_entry))
 ais_file_button = ctk.CTkButton(ais_file_frame, text="...", width=30, command=lambda: select_file(ais_file_entry))
 ais_file_button.pack(side="left", padx=5)
 
-
-
 # Дата + флажок "Утренний отчет"
 date_frame = ctk.CTkFrame(left_panel)
 date_frame.pack()
@@ -353,6 +393,7 @@ morning_report_frame.pack(pady=5, padx=15)
 fix_oiv_frame = ctk.CTkFrame(date_frame)
 fix_oiv_frame.pack(pady=5, padx=15)
 
+
 def check_time():
     now = datetime.now().time()
     target_time = datetime.strptime("15:30", "%H:%M").time()
@@ -363,15 +404,35 @@ morning_var = ctk.BooleanVar(value=check_time())
 morning_checkbox = ctk.CTkCheckBox(morning_report_frame, text="Утро", variable=morning_var)
 
 
-fix_oiv_var = ctk.BooleanVar(value=check_time())
+fix_oiv_var = ctk.BooleanVar()
 fix_oiv_checkbox = ctk.CTkCheckBox(fix_oiv_frame, text="Исправить КОД ОИВ", variable=fix_oiv_var)
+
+
+midind_frame = ctk.CTkFrame(fix_oiv_frame)
+morning_checkbox.pack()
+fix_oiv_checkbox.pack()
+midind_frame.pack()
+
 # summer_report_frame = ctk.CTkFrame(date_frame)
 # summer_report_frame.pack(pady=5, padx=15)
 # summer_var = ctk.BooleanVar(value=True)
 # summer_checkbox = ctk.CTkCheckBox(summer_report_frame, text="Лето", variable=summer_var)
 
-morning_checkbox.pack()
-fix_oiv_checkbox.pack()
+ctk.CTkLabel(midind_frame, text="mid_index:").grid(row=0, column=0, sticky="w", padx=(0, 8))
+mid_index_var = ctk.StringVar(value="0")
+vcmd = (root.register(only_digits), "%P")
+mid_index_entry = ctk.CTkEntry(
+    midind_frame,
+    width=120,
+    textvariable=mid_index_var,
+    validate="key",
+    validatecommand=vcmd,
+    placeholder_text="0..N"
+)
+mid_index_entry.grid(row=0, column=1, sticky="w")
+
+
+mid_index_entry.grid(row=3, column=0, columnspan=3, sticky="w", padx=8, pady=(8, 0))
 # summer_checkbox.pack()
 
 # Предыдущий период (округа)
@@ -421,7 +482,10 @@ weekly_btn = ctk.CTkButton(button_frame, text="Недельный отчет", c
 weekly_btn.pack(side="right", padx=20)
 
 month_btn = ctk.CTkButton(button_frame, text="Месячный отчет", command=generate_report_month)
-weekly_btn.pack(side="right", padx=20)
+month_btn.pack(side="right", padx=20)
+
+kvartal_btn = ctk.CTkButton(button_frame, text="Квартальный отчет", command=generate_report_kvartal)
+kvartal_btn.pack(side="right", padx=20)
 
 # Правая панель
 right_panel = ctk.CTkFrame(main_frame, width=600)

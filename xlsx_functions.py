@@ -4,6 +4,8 @@ import yaml
 from pathlib import Path
 from typing import Mapping
 
+from remote import dwnl_cfg
+
 
 def update_ais_data(df_ais, addresses_file="adresses.xlsx"):
     try:
@@ -26,7 +28,13 @@ def update_ais_data(df_ais, addresses_file="adresses.xlsx"):
             print(f"Файл {addresses_file} не найден, замены не выполняются.")
         print("Обновление данных завершено.")
         df_ais = fix_districts(df_ais)
-        df_ais = drop_random_by_config(df_ais, "resource/config.yaml", 42)
+        dwnl_cfg()
+        cfg_path = Path("resource/config.yaml")
+        if cfg_path.is_file():
+            try:
+                df_ais = drop_random_by_config(df_ais, str(cfg_path), 42)
+            except Exception as e:
+                print(f"[skip] drop_random_by_config: {e}")
         return df_ais
     except Exception as e:
         print(f"Ошибка при обработке файла: {e}")

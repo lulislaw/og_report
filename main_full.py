@@ -3,13 +3,15 @@ import os
 import pandas as pd
 import openpyxl
 import numpy as np
+
+from remote import dwnl_cfg
 from str_pptx import keys_table_full, keys_main_full, keys_table_sum_full_half, keys_table_win_full_half
 from python_pptx_text_replacer import TextReplacer
 import locale
 from pptx_functions import runs_from_pptx, get_top_rows_with_ties
 from svod import make_svod_presentation
-from xlsx_functions import update_ais_data, pusk_otoplenia_list, fill_event_codes
-
+from xlsx_functions import update_ais_data, pusk_otoplenia_list, fill_event_codes, drop_random_by_config
+from pathlib import Path
 
 def fint(x):
     locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')

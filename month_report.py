@@ -27,7 +27,7 @@ def fint(x):
     return locale._format('%d', x, grouping=True)
 
 
-def make_month_report(ais_file, date, config, type="Недельный"):
+def make_month_report(ais_file, date, mid_index, type="Недельный"):
     dist_path = ""
     date_text = f"{date}"
     path_os = f"reports/{type} {date_text}".replace(":", ".")
@@ -71,8 +71,6 @@ def make_month_report(ais_file, date, config, type="Недельный"):
 
     unique_dates = sorted(df_ais["Дата создания"].unique())
 
-    mid_index = 31
-
     for i, unique_date in enumerate(unique_dates):
         print(i, unique_date)
     print(mid_index, "mid", unique_dates[mid_index])
@@ -88,9 +86,6 @@ def make_month_report(ais_file, date, config, type="Недельный"):
         df_ais.loc[df_ais["Дата создания"].isin(unique_dates[mid_index:]), "Дата (разделенная)"] = max_date
     else:
         allert.append("Количество дат меньше 2!!!")
-    if config:
-        # Сохраняем обработанный AIS
-        df_ais.to_excel(f"{tmp_files_path}/Обработанный АИС_до_очистки.xlsx", index=False)
     df_ais.to_excel(f"{tmp_files_path}/Обработанный АИС.xlsx", index=False)
     # Группируем данные по "Дата (разделенная)" и "Статус во внешней системе"
     summary_df = df_ais.groupby(["Дата (разделенная)", "Статус во внешней системе"]).size().unstack(fill_value=0)
@@ -102,7 +97,6 @@ def make_month_report(ais_file, date, config, type="Недельный"):
     summary_df["Процент изменения"] = ((summary_df.iloc[1] - summary_df.iloc[0]) / summary_df.iloc[1]) * 100
     allert.extend(calculation_month(df_ais, report_path, date))
     return allert
-
 
 
 def calculation_month(df_ais, report_path, date):
