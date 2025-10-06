@@ -2,15 +2,13 @@ import os
 from datetime import datetime, timedelta
 
 import pandas as pd
-import openpyxl
 import numpy as np
 from python_pptx_text_replacer import TextReplacer
 import locale
 
 from pptx_functions import get_top_rows_with_ties, runs_from_pptx, update_diagramms
 from str_pptx import keys_weekly_widget, keys_main, keys_table_svod, keys_table_weekly
-from xlsx_functions import update_ais_data
-
+from xlsx_functions import update_ais_data, population
 
 def better_or(value):
     numeric_value = int(value.replace("\xa0", "").replace(" ", ""))
@@ -28,6 +26,7 @@ def fint(x):
 
 
 def make_month_report(ais_file, date, mid_index, type="Недельный"):
+
     dist_path = ""
     date_text = f"{date}"
     path_os = f"reports/{type} {date_text}".replace(":", ".")
@@ -100,6 +99,7 @@ def make_month_report(ais_file, date, mid_index, type="Недельный"):
 
 
 def calculation_month(df_ais, report_path, date):
+    population_moscow = population()
     allert = []
     tmp_files_path = f"{report_path}/tmp_files"
     presentation_maket = "makets/presentation/weekly-full-presentation.pptx"
@@ -119,22 +119,7 @@ def calculation_month(df_ais, report_path, date):
     earl_date_str = str(date_obj.strftime("%d.%m.%Y"))
     replacer.replace_text([("*allperioddate*", f"{earl_date_str} - {last_date_str}"),
                            ("*nowperioddate*", f"{middle_date_str} - {last_date_str}")])
-    population_moscow = {
-        "ЦАО": 774430,
-        "САО": 1217909,
-        "СВАО": 1455811,
-        "ВАО": 1508678,
-        "ЮВАО": 1515787,
-        "ЮАО": 1768752,
-        "ЮЗАО": 1435550,
-        "ЗАО": 1399932,
-        "СЗАО": 1039596,
-        "ЗелАО": 270527,
-        "ТиНАО": 762831,
-        'ГБУ "АВД"': 13149803,
-        'Иные': 13149803,
-        "Общий итог": 13149803
-    }
+
     summary_df = df_ais.groupby(["Дата (разделенная)", "Статус во внешней системе"]).size().unstack(fill_value=0)
 
     # Добавляем колонку с общим количеством записей в каждом периоде

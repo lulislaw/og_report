@@ -1,48 +1,39 @@
 import pandas as pd
 import os
 
-from xlsx_functions import update_ais_data
+from xlsx_functions import update_ais_data, population
 
 
 def make_kvartal_report_excel(file,date):
-    population_moscow = {
-        "ЦАО": 774430,
-        "САО": 1217909,
-        "СВАО": 1455811,
-        "ВАО": 1508678,
-        "ЮВАО": 1515787,
-        "ЮАО": 1768752,
-        "ЮЗАО": 1435550,
-        "ЗАО": 1399932,
-        "СЗАО": 1039596,
-        "ЗелАО": 270527,
-        "ТиНАО": 762831,
-        "Общий итог": 13149803
-    }
+    population_moscow = population()
 
     date_text = f"{date}"
     dist_path = ""
     tmp_files_img_path = os.path.join(dist_path, "reports", f"{date_text}", "tmp_files", "img").replace(":", ".")
     tmp_files_path = os.path.join(dist_path, "reports", f"{date_text}", "tmp_files").replace(":", ".")
     reports_path = os.path.join(dist_path, "reports")
-    # Порядок округов
 
     for path in [tmp_files_path, tmp_files_img_path, reports_path]:
         if not os.path.exists(path):
             print(f"Создание директории: {path}")
             os.makedirs(path, exist_ok=True)
     excel_path = f"{reports_path}/kvartal.xlsx"
-    order = ["ЦАО", "САО", "СВАО", "ВАО", "ЮВАО", "ЮАО", "ЮЗАО", "ЗАО", "СЗАО", "ЗелАО", "ТиНАО"]
+    order = ["ЦАО", "САО", "СВАО", "ВАО", "ЮВАО", "ЮАО", "ЮЗАО", "ЗАО", "СЗАО", "ЗелАО", "ТиНАО", 'ГБУ "АВД"', 'Иные']
     if ".xlsx" in file:
         df = pd.read_excel(file)
     else:
         df = pd.read_csv(file, low_memory=False)
     df = update_ais_data(df)
+    df["Наименование события"] = df["Наименование события КОД ОИВ"]
     df["Округ"] = df["Округ"].astype(str).str.strip()
     df = df[~df["Округ"].isin(["", "nan", "None"])]
-
+    status_mapping = {"Новое": "В работе", "Отменено": "Закрыто"}
+    df["Округ"] = df["Округ"].replace({"НАО": "ТиНАО", "ТАО": "ТиНАО"})
+    df["Статус во внешней системе"] = df["Статус во внешней системе"].replace(status_mapping)
+    df.loc[df["Район"].isin(["Ново-Переделкино", "Солнцево"]), "Округ"] = "ЗАО"
+    df.loc[df["Район"] == "Внуково", "Округ"] = "ТиНАО"
+    df["Район"] = df["Район"].str.split(",").str[0].str.strip()
     print(df["Округ"].unique())
-    # Первая таблица
     count_table = (
         df["Округ"].value_counts()
         .rename_axis("Округ")
@@ -165,8 +156,6 @@ def make_kvartal_report_excel(file,date):
 
     print("Таблица с удельными значениями по районам добавлена.")
 
-    # Порядок округов
-    order = ["ЦАО", "САО", "СВАО", "ВАО", "ЮВАО", "ЮАО", "ЮЗАО", "ЗАО", "СЗАО", "ЗелАО", "ТиНАО"]
 
     # 1. Фильтрация: только МКД
     df_mkd = df[df["Тип объекта"] == "МКД"]
@@ -287,10 +276,6 @@ def make_kvartal_report_excel(file,date):
             top_addresses.to_excel(writer, sheet_name=sheet_name, index=False)
 
     print("Топ-10 адресов для топ-8 событий по МКД сохранены.")
-    # Порядок округов
-    # Порядок округов
-    order = ["ЦАО", "САО", "СВАО", "ВАО", "ЮВАО", "ЮАО", "ЮЗАО", "ЗАО", "СЗАО", "ЗелАО", "ТиНАО"]
-
     # 1. Фильтрация: Прочие (не-МКД)
     df_other = df[df["Тип объекта"] != "МКД"]
 

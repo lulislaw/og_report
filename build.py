@@ -58,7 +58,7 @@ def post_build_tasks():
 
 
 def create_zip_archive():
-    version = "1.1.12"
+    version = "1.1.14"
     dist_path = os.path.join("dist", "GUI")
     zip_filename = os.path.join("dist", f"GUI_{version}.zip")
 
