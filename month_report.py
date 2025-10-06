@@ -245,7 +245,10 @@ def calculation_month(df_ais, report_path, date):
         table_list.append((f"*t{i}cn*", fint(closed_late)))
         table_list.append((f"*t{i}wc*", fint(inwork_early)))
         table_list.append((f"*t{i}wn*", fint(inwork_late)))
-        percent = round(((theme_count - theme_count_earliest) / theme_count_earliest) * 100)
+        if theme_count_earliest != 0:
+            percent = round(((theme_count - theme_count_earliest) / theme_count_earliest) * 100)
+        else:
+            percent = round(1 * 100)
         percent = f"↘ {percent}%" if percent < 0 else f"↗ {percent}%"
         table_list.append((f"*t{i}ce*", fint(theme_count_earliest)))
         table_list.append((f"*t{i}prc*", percent))
