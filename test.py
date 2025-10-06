@@ -1,5 +1,4 @@
-from main_full import make_main_full_presentation
-from remote import guard_or_raise
+
 
 #
 # ais_file = "Отчет по событиям за 30.08.2025 06.30 - 30.08.2025 15.29.xlsx"
@@ -20,5 +19,3 @@ from remote import guard_or_raise
 #     }
 # make_main_full_presentation(ais_file, "None", previous_period, "02.01.2003", True)
 
-
-print(guard_or_raise())
