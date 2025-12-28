@@ -10,7 +10,7 @@ from python_pptx_text_replacer import TextReplacer
 import locale
 from pptx_functions import runs_from_pptx, get_top_rows_with_ties
 from svod import make_svod_presentation
-from xlsx_functions import update_ais_data, pusk_otoplenia_list, fill_event_codes, drop_random_by_config
+from xlsx_functions import update_ais_data, pusk_otoplenia_list, fill_event_codes, drop_random_by_config, population
 from pathlib import Path
 
 def fint(x):
@@ -38,22 +38,7 @@ def make_main_full_presentation(ais_file, previous_period, date, morning, fix_oi
             os.makedirs(path, exist_ok=True)
     # Население Москвы по округам
     allert = []
-    population_moscow = {
-        "ЦАО": 774430,
-        "САО": 1217909,
-        "СВАО": 1455811,
-        "ВАО": 1508678,
-        "ЮВАО": 1515787,
-        "ЮАО": 1768752,
-        "ЮЗАО": 1435550,
-        "ЗАО": 1399932,
-        "СЗАО": 1039596,
-        "ЗелАО": 270527,
-        "ТиНАО": 762831,
-        'ГБУ "АВД"': 13149803,
-        'Иные': 13149803,
-        "Общий итог": 13149803
-    }
+    population_moscow = population()
     previous_period["Общий итог"] = None
     # Заданный порядок округов
     order = ["ЦАО", "САО", "СВАО", "ВАО", "ЮВАО", "ЮАО", "ЮЗАО", "ЗАО", "СЗАО", "ЗелАО", "ТиНАО", 'ГБУ "АВД"', "Иные",

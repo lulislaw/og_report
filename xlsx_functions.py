@@ -125,12 +125,24 @@ def population():
     }
 
 
-def fill_event_codes(df: pd.DataFrame) -> pd.DataFrame:
-    ref_df = pd.read_excel("resource/mapping.xlsx")
+def fill_event_codes(df: pd.DataFrame, mapping_path: str = "resource/mapping.xlsx") -> pd.DataFrame:
+    ref_df = pd.read_excel(mapping_path)
+
     mapping = (
         ref_df.drop_duplicates(subset=["Наименование события", "Наименование события КОД ОИВ"])
-        .set_index("Наименование события")["Наименование события КОД ОИВ"]
-        .to_dict()
+              .set_index("Наименование события")["Наименование события КОД ОИВ"]
+              .to_dict()
     )
-    df["Наименование события КОД ОИВ"] = df["Наименование события"].map(mapping)
+
+    target_col = "Наименование события КОД ОИВ"
+    source_col = "Наименование события"
+
+    # если колонки назначения нет — создаём
+    if target_col not in df.columns:
+        df[target_col] = pd.NA
+
+    # заполняем только там, где в target_col пусто
+    mask = df[target_col].isna() | (df[target_col].astype("string").str.strip() == "")
+    df.loc[mask, target_col] = df.loc[mask, source_col].map(mapping)
+
     return df

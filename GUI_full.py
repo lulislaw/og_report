@@ -404,7 +404,7 @@ morning_var = ctk.BooleanVar(value=check_time())
 morning_checkbox = ctk.CTkCheckBox(morning_report_frame, text="Утро", variable=morning_var)
 
 
-fix_oiv_var = ctk.BooleanVar()
+fix_oiv_var = ctk.BooleanVar(value=True)
 fix_oiv_checkbox = ctk.CTkCheckBox(fix_oiv_frame, text="Исправить КОД ОИВ", variable=fix_oiv_var)
 
 
