@@ -23,8 +23,8 @@
 
 from svod import make_svod_presentation
 
-make_svod_presentation("reports/03.02.2026 на 17.00/tmp_files/Обработанный АИС.xlsx",
-                       "reports/03.02.2026 на 17.00/tmp_files/Обработанный АИС(Пуск отопления).xlsx", "03.02.2026",
+make_svod_presentation("reports/02.03.2026 на 17.00/tmp_files/Обработанный АИС.xlsx",
+                       "reports/02.03.2026 на 17.00/tmp_files/Обработанный АИС(Пуск отопления).xlsx", "02.03.2026",
                        False, False)
 
 

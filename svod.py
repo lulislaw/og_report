@@ -232,49 +232,90 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
                 aggfunc="size",
                 fill_value=0,
             )
-
+            # Оставляем только top-10 событий, даже если по ним пока нет данных
             pivot_table_district = pivot_table_district.reindex(top_10_events, fill_value=0)
-            pivot_table_district["Итого по строке"] = pivot_table_district.sum(axis=1)
 
+            # -----------------------------
+            # Строка "Пуск отопления"
+            # -----------------------------
             edc_summary_district = df_district_edc["Район"].value_counts()
-            edc_summary_district["Итого по строке"] = int(edc_summary_district.sum())
             edc_summary_district.name = "Пуск отопления"
-
             edc_row_district = pd.DataFrame(edc_summary_district).T
-            edc_row_district = edc_row_district.reindex(columns=pivot_table_district.columns, fill_value=0)
 
-            if "Пуск отопления" not in pivot_table_district.index:
-                pivot_table_district.loc["Пуск отопления"] = 0
-            pivot_table_district.loc["Пуск отопления"] += edc_row_district.loc["Пуск отопления"]
-
+            # -----------------------------
+            # Строка "Иные"
+            # -----------------------------
             df_district_ais_other = df_ais.loc[
                 (df_ais["Округ"] == district) & (~df_ais[ais_event_name].isin(top_10_events)),
                 ["Район"],
             ].copy()
 
             other_summary_district = df_district_ais_other["Район"].value_counts()
-            other_summary_district["Итого по строке"] = int(other_summary_district.sum())
             other_summary_district.name = "Иные"
-
             other_row_district = pd.DataFrame(other_summary_district).T
-            other_row_district = other_row_district.reindex(columns=pivot_table_district.columns, fill_value=0)
 
+            # -----------------------------
+            # Собираем полный список районов:
+            # 1. из pivot
+            # 2. из Пуск отопления
+            # 3. из Иные
+            # -----------------------------
+            all_districts = list(
+                dict.fromkeys(
+                    list(pivot_table_district.columns)
+                    + list(edc_row_district.columns)
+                    + list(other_row_district.columns)
+                )
+            )
+
+            # Расширяем pivot новыми районами, если они появились только в "Иные" или "Пуск отопления"
+            pivot_table_district = pivot_table_district.reindex(columns=all_districts, fill_value=0)
+
+            # Приводим дополнительные строки к тем же колонкам
+            edc_row_district = edc_row_district.reindex(columns=all_districts, fill_value=0)
+            other_row_district = other_row_district.reindex(columns=all_districts, fill_value=0)
+
+            # -----------------------------
+            # Добавляем/обновляем строку "Пуск отопления"
+            # -----------------------------
+            if "Пуск отопления" not in pivot_table_district.index:
+                pivot_table_district.loc["Пуск отопления"] = 0
+
+            pivot_table_district.loc["Пуск отопления", all_districts] = (
+                    pivot_table_district.loc["Пуск отопления", all_districts]
+                    + edc_row_district.loc["Пуск отопления", all_districts]
+            )
+
+            # -----------------------------
+            # Добавляем/обновляем строку "Иные"
+            # -----------------------------
             if "Иные" not in pivot_table_district.index:
                 pivot_table_district.loc["Иные"] = 0
-            pivot_table_district.loc["Иные"] += other_row_district.loc["Иные"]
 
-            pivot_table_district["Итого по строке"] = pivot_table_district.drop(
-                columns=["Итого по строке"], errors="ignore"
-            ).sum(axis=1)
+            pivot_table_district.loc["Иные", all_districts] = (
+                    pivot_table_district.loc["Иные", all_districts]
+                    + other_row_district.loc["Иные", all_districts]
+            )
 
-            num_columns = pivot_table_district.shape[1]
+            # -----------------------------
+            # Итого по строке
+            # -----------------------------
+            pivot_table_district["Итого по строке"] = pivot_table_district[all_districts].sum(axis=1)
 
+            # -----------------------------
+            # Итого по столбцу
+            # -----------------------------
             column_sums_district = pivot_table_district.sum(axis=0)
             column_sums_district.name = "Итого по столбцу"
 
             pivot_table_with_heating_district = pd.concat(
                 [pivot_table_district, pd.DataFrame([column_sums_district])]
             )
+
+            # -----------------------------
+            # Подготовка данных для шаблона
+            # -----------------------------
+            num_columns = pivot_table_district.shape[1]
 
             letters = ["c", "s", "sv", "v", "yv", "y", "yz", "z", "sz", "ze", "tin"]
             row_len = [11, 17, 18, 17, 13, 17, 13, 13, 9, 6, 6]
@@ -294,6 +335,7 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
             keys_district = generate_table(letter, num_columns, 13)
             flat_keys = [key for row in keys_district for key in row]
             flat_values = pivot_table_with_heating_district.to_numpy().flatten()
+
             table_dict = dict(zip(flat_keys, flat_values))
 
             table_list = [
@@ -325,7 +367,9 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
             replacer.replace_text(s_table_list)
 
             with pd.ExcelWriter(
-                    f"{tmp_files_path}/Результаты по своду.xlsx", mode="a", engine="openpyxl"
+                    f"{tmp_files_path}/Результаты по своду.xlsx",
+                    mode="a",
+                    engine="openpyxl",
             ) as writer:
                 pivot_table_with_heating_district.to_excel(writer, sheet_name=district)
 
