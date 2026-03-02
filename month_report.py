@@ -10,6 +10,7 @@ from pptx_functions import get_top_rows_with_ties, runs_from_pptx, update_diagra
 from str_pptx import keys_weekly_widget, keys_main, keys_table_svod, keys_table_weekly
 from xlsx_functions import update_ais_data, population
 
+
 def better_or(value):
     numeric_value = int(value.replace("\xa0", "").replace(" ", ""))
     allper_value = value
@@ -26,7 +27,6 @@ def fint(x):
 
 
 def make_month_report(ais_file, date, mid_index, type="Недельный"):
-
     dist_path = ""
     date_text = f"{date}"
     path_os = f"reports/{type} {date_text}".replace(":", ".")
@@ -85,7 +85,11 @@ def make_month_report(ais_file, date, mid_index, type="Недельный"):
         df_ais.loc[df_ais["Дата создания"].isin(unique_dates[mid_index:]), "Дата (разделенная)"] = max_date
     else:
         allert.append("Количество дат меньше 2!!!")
-    df_ais.to_excel(f"{tmp_files_path}/Обработанный АИС.xlsx", index=False)
+    try:
+        df_ais.to_excel(f"{tmp_files_path}/Обработанный АИС.xlsx", index=False)
+    except Exception as e:
+        print(e)
+        df_ais.to_csv(f"{tmp_files_path}/Обработанный АИС.csv", index=False)
     # Группируем данные по "Дата (разделенная)" и "Статус во внешней системе"
     summary_df = df_ais.groupby(["Дата (разделенная)", "Статус во внешней системе"]).size().unstack(fill_value=0)
 

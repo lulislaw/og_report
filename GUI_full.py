@@ -66,7 +66,7 @@ def generate_report_halfdaily():
         morning = morning_var.get()
         fix_oiv = fix_oiv_var.get()
         previous_period_data = {district: int(entry_vars[district].get() or 0) for district in entry_vars}
-        report_lines = make_main_full_presentation(ais_file, previous_period_data, date_str, morning, fix_oiv)
+        report_lines = make_main_full_presentation(ais_file, previous_period_data, date_str, True, fix_oiv)
         for line in report_lines:
             print(line)
 
@@ -157,7 +157,7 @@ def update_buttons_visibility():
         btn.pack_forget()
     if report_type == "Полусуточный":
         halfdaily_btn.pack(side="right", padx=20)
-        morning_report_frame.pack()
+        morning_report_frame.pack_forget()
     elif report_type == "Недельный":
         weekly_btn.pack(side="right", padx=20)
         morning_report_frame.pack_forget()

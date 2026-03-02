@@ -1,8 +1,8 @@
 import pandas as pd
 import os
-folder_path = 'files_for_merge/files_01'
-csv = False
-output_path = 'files_for_merge/files_01_final'
+folder_path = 'month/month_01'
+csv = True
+output_path = 'month/monrh_01_f'
 files = [
     os.path.join(folder_path, f)
     for f in os.listdir(folder_path)
@@ -24,12 +24,12 @@ if filter:
     df_filtered = df_merged[selected_columns]
 
     if csv:
-        df_filtered.to_csv(f"{output_path}.csv", index=False)
+        df_filtered.to_csv(f"{output_path}.csv", index=False, sep=';')
     else:
         df_filtered.to_excel(f"{output_path}.xlsx", index=False)
 else:
     if csv:
-        df_merged.to_csv(f"{output_path}.csv", index=False)
+        df_merged.to_csv(f"{output_path}.csv", index=False, sep=';')
     else:
         df_merged.to_excel(f"{output_path}.xlsx", index=False)
 

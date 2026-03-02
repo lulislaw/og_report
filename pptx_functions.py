@@ -197,7 +197,8 @@ def date_diagramm_update(presentation, slide_id, dates, values, shape_id):
 
 
 def region_data_update(presentation, slide_id, previous_period, current_period, shape_id):
-    categories = ["ЦАО", "САО", "СВАО", "ВАО", "ЮВАО", "ЮАО", "ЮЗАО", "ЗАО", "СЗАО", "ЗелАО", "ТиНАО", "ГБУ«АВД»", "Иные"]
+    categories = ["ЦАО", "САО", "СВАО", "ВАО", "ЮВАО", "ЮАО", "ЮЗАО", "ЗАО", "СЗАО", "ЗелАО", "ТиНАО", "ГБУ«АВД»",
+                  "Иные"]
     slide = presentation.Slides(slide_id + 1)  # COM использует 1-based индексацию
     for sh, shape in enumerate(slide.Shapes):
         if shape.HasChart and sh == shape_id:  # Проверяем, является ли объект диаграммой
@@ -612,6 +613,96 @@ def color_arrows_in_shape(shape):
     if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
         for sub_shape in shape.shapes:
             color_arrows_in_shape(sub_shape)
+
+
+def runs_from_pptx_svod(pptx_file_path):
+    presentation = Presentation(pptx_file_path)
+    for sl, slide in enumerate(presentation.slides):
+        for sh, shape in enumerate(slide.shapes):
+            if shape.shape_type == 19:  # Проверяем, что это таблица
+                table = shape.table
+                last_row_index = len(table.rows) - 1  # Индекс последней строки
+                last_col_index = len(table.columns) - 1  # Индекс последнего столбца
+                for r, row in enumerate(table.rows):
+                    if r == last_row_index or r == 0:  # Пропускаем последнюю строку
+                        continue
+                    # Создаем список (столбец, значение) для текущей строки
+                    counts_list_row = []
+                    for c, cell in enumerate(row.cells):
+                        if c == last_col_index or c == 0:  # Пропускаем последнюю колонку
+                            continue
+
+                        if cell.text_frame:
+                            for paragraph in cell.text_frame.paragraphs:
+                                text = "".join(run.text for run in paragraph.runs)
+                                # Извлекаем числа из текста
+                                text = text.replace(" ", "")
+                                numbers = re.findall(r'\b\d+\b', text)
+                                if numbers:
+                                    number = numbers[0]
+                                    if number != '0':
+                                        counts_list_row.append((c, number))  # Сохраняем индекс столбца и значение
+                    print(counts_list_row)
+                    # Используем вашу функцию для определения топ-3 столбцов
+                    top_columns = get_top_rows_with_ties(counts_list_row, top_n=3)
+                    print(f"topcollums: {top_columns}")
+                    # Окрашиваем ячейки с топовыми значениями
+                    for c in top_columns:
+                        cell = row.cells[c]
+                        if cell.text_frame:
+                            for paragraph in cell.text_frame.paragraphs:
+                                for run in paragraph.runs:
+                                    run.font.color.rgb = colors["red_text"]
+        presa = highlight_top3_in_last_column(presentation)
+    return presa
+
+
+def highlight_top3_in_last_column(presentation):
+    for sl, slide in enumerate(presentation.slides):
+        if sl == 0:
+            continue
+        for sh, shape in enumerate(slide.shapes):
+            if shape.shape_type != 19:  # таблица
+                continue
+
+            table = shape.table
+            last_row_index = len(table.rows) - 2
+            last_col_index = len(table.columns) - 1
+
+            # Собираем (row_index, number) только по последней колонке
+            counts_last_col = []
+            for r, row in enumerate(table.rows):
+                if r == 0 or r >= last_row_index:  # пропускаем заголовок и итог
+                    continue
+
+                cell = row.cells[last_col_index]
+                if not cell.text_frame:
+                    continue
+
+                # Вытаскиваем число из текста ячейки
+                cell_text = ""
+                for paragraph in cell.text_frame.paragraphs:
+                    cell_text += "".join(run.text for run in paragraph.runs)
+
+                cell_text = cell_text.replace(" ", "")
+                numbers = re.findall(r'\b\d+\b', cell_text)
+                if numbers:
+                    number = numbers[0]
+                    if number != "0":
+                        counts_last_col.append((r, number))
+
+            # ТОП-3 строки по последней колонке
+            top_rows = get_top_rows_with_ties(counts_last_col, top_n=3)
+
+            # Красим только ячейки последней колонки в найденных строках
+            for r in top_rows:
+                cell = table.rows[r].cells[last_col_index]
+                if cell.text_frame:
+                    for paragraph in cell.text_frame.paragraphs:
+                        for run in paragraph.runs:
+                            run.font.color.rgb = colors["red_text"]
+
+    return presentation
 
 
 def runs_from_pptx(pptx_file_path, top_dict, type_report):

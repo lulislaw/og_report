@@ -20,12 +20,7 @@ def fint(x):
 
 def make_main_full_presentation(ais_file, previous_period, date, morning, fix_oiv):
     summer = False
-    time_morning = "8:00"
-    time_evening = "17:00"
-    if morning:
-        time = time_morning
-    else:
-        time = time_evening
+    time = "17:00"
     date_text = f"{date} на {time}"
     dist_path = ""
     tmp_files_img_path = os.path.join(dist_path, "reports", f"{date_text}", "tmp_files", "img").replace(":", ".")

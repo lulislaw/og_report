@@ -1,7 +1,7 @@
-
-
 #
-# ais_file = "Отчет по событиям за 30.08.2025 06.30 - 30.08.2025 15.29.xlsx"
+# from main_full import make_main_full_presentation
+#
+# ais_file = "Отчет_по_событиям_за_03_02_2026_15_30_04_02_2026_06_29.xlsx"
 # previous_period = {
 #         "ЦАО": 1,
 #         "САО": 1,
@@ -17,5 +17,14 @@
 #         'ГБУ "АВД"': 1,
 #         'Иные': 1,
 #     }
-# make_main_full_presentation(ais_file, "None", previous_period, "02.01.2003", True)
+# make_main_full_presentation(ais_file, previous_period, "03.02.2026", False, True)
+#
+
+
+from svod import make_svod_presentation
+
+make_svod_presentation("reports/03.02.2026 на 17.00/tmp_files/Обработанный АИС.xlsx",
+                       "reports/03.02.2026 на 17.00/tmp_files/Обработанный АИС(Пуск отопления).xlsx", "03.02.2026",
+                       False, False)
+
 

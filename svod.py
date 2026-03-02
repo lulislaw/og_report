@@ -4,7 +4,7 @@ import os
 from str_pptx import generate_table, keys_table_svod
 from python_pptx_text_replacer import TextReplacer
 import locale
-from pptx_functions import remove_slides_tinao, convert_pptx_to_pdf, pdf_to_png
+from pptx_functions import remove_slides_tinao, convert_pptx_to_pdf, pdf_to_png, runs_from_pptx_svod
 from datetime import datetime, timedelta
 from openpyxl.drawing.image import Image
 from openpyxl import Workbook, load_workbook
@@ -76,7 +76,7 @@ def insert_images_to_excel(image_paths, excel_files):
 
 def make_svod_presentation(ais_file, edc_file, date, morning, summer):
     # Заданный порядок округов
-    order = ["ЦАО", "САО", "СВАО", "ВАО", "ЮВАО", "ЮАО", "ЮЗАО", "ЗАО", "СЗАО", "ЗелАО", "ТиНАО", "Общий итог"]
+    order = ["ЦАО", "САО", "СВАО", "ВАО", "ЮВАО", "ЮАО", "ЮЗАО", "ЗАО", "СЗАО", "ЗелАО", "ТиНАО",  'ГБУ "АВД"', "Иные", "Общий итог"]
 
     # Данные для предыдущего периода
     presentation_maket = "makets/presentation/svod_presentation.pptx"
@@ -84,28 +84,23 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
         presentation_maket = "makets/presentation/svod_presentation-sum.pptx"
     replacer = TextReplacer(presentation_maket, slides='',
                             tables=True, charts=True, textframes=True, quiet=True)
-    time_morning = "8:00"
-    time_evening = "17:00"
-    if morning:
-        time = time_morning
-    else:
-        time = time_evening
-
+    time = "17:00"
     date_text = f"{date} на {time}"
     tmp_files_path = os.path.join("", "reports", f"{date_text}", "tmp_files").replace(":", ".")
     path_os = f"reports/{date_text}".replace(":", ".")
     if not os.path.exists(f"{path_os}/Сводка"):
         os.makedirs(f"{path_os}/Сводка")
-    f_time = time_morning
+    f_time = "17:00"
     f_date = date
     if morning:
-        f_time = time_evening
         date_obj = datetime.strptime(date, "%d.%m.%Y")
         date_obj -= timedelta(days=1)
         f_date = str(date_obj.strftime("%d.%m.%Y"))
     date_svod_text = f"с {f_time} {f_date} по {time} {date}".replace(":", ".")
     xlsx_folder = f"{path_os}/Сводка"
     xlsx_files = [os.path.join(xlsx_folder, f"{name} {date_svod_text}.xlsx") for name in order]
+    xlsx_files.pop()
+    xlsx_files.pop()
     xlsx_files.pop()
     ais_event_name = "Наименование события"
     df_ais = pd.read_excel(ais_file)
@@ -147,6 +142,11 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
     pivot_table_with_heating = pd.concat([top_10, edc_row])
     pivot_table_with_heating = pivot_table_with_heating.sort_values(by="Итого по строке", ascending=False)
 
+    remaining_rows = original_pivot_table.drop(index=pivot_table_with_heating.index, errors="ignore")
+    other_row = remaining_rows.sum(axis=0)  # Суммируем оставшиеся строки
+    other_row.name = "Иные"
+    pivot_table_with_heating = pd.concat([pivot_table_with_heating, pd.DataFrame([other_row])])
+
     # Добавляем строку "Итого по столбцу"
     column_sums = pivot_table_with_heating.sum(axis=0)
     column_sums.name = "Итого по столбцу"
@@ -164,12 +164,15 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
     top_10_events = final_table.index[:-1]  # Берем те же темы, исключая "Итого по столбцу"
     tinao_len = 0
     for i, district in enumerate(order):
+        print(f"XYU. {district}")
         if district == "Общий итог":
             continue
         df_district_ais = df_ais[
             (df_ais["Округ"] == district) & (df_ais[ais_event_name].isin(top_10_events))
             ]
-        df_district_ais_xl = df_district_ais.copy()
+        df_district_ais_spec_xl = df_ais[
+            (df_ais["Округ"] == district)]
+        df_district_ais_xl = df_district_ais_spec_xl.copy()
         df_district_edc = df_edc[df_edc["Округ"] == district]
         selected_columns = [
             "№ во внешней системе", "№ в системе", "Наименование события", "Система", "Ответственный",
@@ -178,11 +181,11 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
         df_district_ais_for_xl = df_district_ais_xl[selected_columns].copy()
         df_district_ais_for_xl.loc[:, "Статус"] = ""
         df_district_ais_for_xl.loc[:, "Примечание"] = ""
-
-        with pd.ExcelWriter(f"{path_os}/Сводка/{district} {date_svod_text}.xlsx", mode="w",
+        district_clear = district.replace('"', '')
+        with pd.ExcelWriter(f"{path_os}/Сводка/{district_clear} {date_svod_text}.xlsx", mode="w",
                             engine="openpyxl") as writer:
             df_district_ais_for_xl.to_excel(writer, sheet_name="АИС ЦУ КГХ", index=False)
-        wb = load_workbook(f"{path_os}/Сводка/{district} {date_svod_text}.xlsx")
+        wb = load_workbook(f"{path_os}/Сводка/{district_clear} {date_svod_text}.xlsx")
         ws = wb["АИС ЦУ КГХ"]
         ws.insert_rows(1)
         ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=11)
@@ -212,87 +215,119 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
                 cell.alignment = Alignment(wrap_text=True, vertical="center")
         header_cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        wb.save(f"{path_os}/Сводка/{district} {date_svod_text}.xlsx")
+        wb.save(f"{path_os}/Сводка/{district_clear} {date_svod_text}.xlsx")
         wb.close()
         print(f"{district}")
         if not summer:
-            with pd.ExcelWriter(f"{path_os}/Сводка/{district} {date_svod_text}.xlsx", mode="a", engine="openpyxl",
+            with pd.ExcelWriter(f"{path_os}/Сводка/{district_clear} {date_svod_text}.xlsx", mode="a", engine="openpyxl",
                                 if_sheet_exists="replace") as writer:
                 df_district_edc.to_excel(writer, sheet_name="ЕДЦ")
-        pivot_table_district = pd.pivot_table(
-            df_district_ais,
-            index=ais_event_name,
-            columns="Район",
-            aggfunc="size",
-            fill_value=0
-        )
-
-        pivot_table_district = pivot_table_district.reindex(top_10_events, fill_value=0)
-
-        pivot_table_district["Итого по строке"] = pivot_table_district.sum(axis=1)
-
-        # Считаем количество обращений по отоплению по районам
-        edc_summary_district = df_district_edc["Район"].value_counts()
-        edc_summary_district["Итого по строке"] = edc_summary_district.sum()
-        edc_summary_district.name = "Пуск отопления"
-
-        # Преобразуем в DataFrame для сложения
-        edc_row_district = pd.DataFrame(edc_summary_district).T
-
-        # Приводим порядок колонок к `pivot_table_district`
-        edc_row_district = edc_row_district.reindex(columns=pivot_table_district.columns, fill_value=0)
-
-        # 🛠 Обновляем строку "Пуск отопления", суммируя данные
-        pivot_table_district.loc["Пуск отопления"] += edc_row_district.loc["Пуск отопления"]
-
-        num_columns = pivot_table_district.shape[1]
-
-        column_sums_district = pivot_table_district.sum(axis=0)
-
-        column_sums_district.name = "Итого по столбцу"
-        pivot_table_with_heating_district = pd.concat(
-            [pivot_table_district, pd.DataFrame([column_sums_district])])
-        letters = ["c", "s", "sv", "v", "yv", "y", "yz", "z", "sz", "ze", "tin"]
-        row_len = [11, 17, 18, 17, 13, 17, 13, 13, 9, 6, 6]
-        if district == "ТиНАО":
-            letter = "tin"
-            tinao_len = num_columns
-            if num_columns > 13:
-                allert.append(f"Внимание! У ТИНАО больше 12 районов!!!")
+        if district == 'ГБУ "АВД"' or district == 'Иные':
+            print(f"{district} не рисует слайд")
         else:
-            letter = letters[i]
-            if num_columns < row_len[i]:
-                allert.append(f"Внимание! У {district} меньше районов!")
-            elif num_columns > row_len[i]:
-                allert.append(f"Внимание! У {district} больше районов!")
-        keys_district = generate_table(letter, num_columns, 12)
-        flat_keys = [key for row in keys_district for key in row]
-        flat_values = pivot_table_with_heating_district.to_numpy().flatten()
-        table_dict = dict(zip(flat_keys, flat_values))
-        table_list = [
-
-            (
-                key,
-                fint(int(value)) if isinstance(value, (int, float)) and value.is_integer() else str(value)
+            pivot_table_district = pd.pivot_table(
+                df_district_ais,
+                index=ais_event_name,
+                columns="Район",
+                aggfunc="size",
+                fill_value=0,
             )
-            for key, value in table_dict.items()
-        ]
-        streets = list(pivot_table_with_heating_district.columns[:-1])
-        streets_key = generate_table(f"r{letters[i]}", len(streets) + 1, 2)
-        s_flat_keys = [key for row in streets_key for key in row]
-        s_dict = dict(zip(s_flat_keys, streets))
-        s_table_list = [
 
-            (
-                key,
-                fint(int(value)) if isinstance(value, (int, float)) and value.is_integer() else str(value)
+            pivot_table_district = pivot_table_district.reindex(top_10_events, fill_value=0)
+            pivot_table_district["Итого по строке"] = pivot_table_district.sum(axis=1)
+
+            edc_summary_district = df_district_edc["Район"].value_counts()
+            edc_summary_district["Итого по строке"] = int(edc_summary_district.sum())
+            edc_summary_district.name = "Пуск отопления"
+
+            edc_row_district = pd.DataFrame(edc_summary_district).T
+            edc_row_district = edc_row_district.reindex(columns=pivot_table_district.columns, fill_value=0)
+
+            if "Пуск отопления" not in pivot_table_district.index:
+                pivot_table_district.loc["Пуск отопления"] = 0
+            pivot_table_district.loc["Пуск отопления"] += edc_row_district.loc["Пуск отопления"]
+
+            df_district_ais_other = df_ais.loc[
+                (df_ais["Округ"] == district) & (~df_ais[ais_event_name].isin(top_10_events)),
+                ["Район"],
+            ].copy()
+
+            other_summary_district = df_district_ais_other["Район"].value_counts()
+            other_summary_district["Итого по строке"] = int(other_summary_district.sum())
+            other_summary_district.name = "Иные"
+
+            other_row_district = pd.DataFrame(other_summary_district).T
+            other_row_district = other_row_district.reindex(columns=pivot_table_district.columns, fill_value=0)
+
+            if "Иные" not in pivot_table_district.index:
+                pivot_table_district.loc["Иные"] = 0
+            pivot_table_district.loc["Иные"] += other_row_district.loc["Иные"]
+
+            pivot_table_district["Итого по строке"] = pivot_table_district.drop(
+                columns=["Итого по строке"], errors="ignore"
+            ).sum(axis=1)
+
+            num_columns = pivot_table_district.shape[1]
+
+            column_sums_district = pivot_table_district.sum(axis=0)
+            column_sums_district.name = "Итого по столбцу"
+
+            pivot_table_with_heating_district = pd.concat(
+                [pivot_table_district, pd.DataFrame([column_sums_district])]
             )
-            for key, value in s_dict.items()
-        ]
-        replacer.replace_text(table_list)
-        replacer.replace_text(s_table_list)
-        with pd.ExcelWriter(f"{tmp_files_path}/Результаты по своду.xlsx", mode="a", engine="openpyxl") as writer:
-            pivot_table_with_heating_district.to_excel(writer, sheet_name=district)
+
+            letters = ["c", "s", "sv", "v", "yv", "y", "yz", "z", "sz", "ze", "tin"]
+            row_len = [11, 17, 18, 17, 13, 17, 13, 13, 9, 6, 6]
+
+            if district == "ТиНАО":
+                letter = "tin"
+                tinao_len = num_columns
+                if num_columns > 13:
+                    allert.append("Внимание! У ТИНАО больше 12 районов!!!")
+            else:
+                letter = letters[i]
+                if num_columns < row_len[i]:
+                    allert.append(f"Внимание! У {district} меньше районов!")
+                elif num_columns > row_len[i]:
+                    allert.append(f"Внимание! У {district} больше районов!")
+
+            keys_district = generate_table(letter, num_columns, 13)
+            flat_keys = [key for row in keys_district for key in row]
+            flat_values = pivot_table_with_heating_district.to_numpy().flatten()
+            table_dict = dict(zip(flat_keys, flat_values))
+
+            table_list = [
+                (
+                    key,
+                    fint(int(value))
+                    if isinstance(value, (int, float)) and float(value).is_integer()
+                    else str(value),
+                )
+                for key, value in table_dict.items()
+            ]
+
+            streets = list(pivot_table_with_heating_district.columns[:-1])
+            streets_key = generate_table(f"r{letters[i]}", len(streets) + 1, 2)
+            s_flat_keys = [key for row in streets_key for key in row]
+            s_dict = dict(zip(s_flat_keys, streets))
+
+            s_table_list = [
+                (
+                    key,
+                    fint(int(value))
+                    if isinstance(value, (int, float)) and float(value).is_integer()
+                    else str(value),
+                )
+                for key, value in s_dict.items()
+            ]
+
+            replacer.replace_text(table_list)
+            replacer.replace_text(s_table_list)
+
+            with pd.ExcelWriter(
+                    f"{tmp_files_path}/Результаты по своду.xlsx", mode="a", engine="openpyxl"
+            ) as writer:
+                pivot_table_with_heating_district.to_excel(writer, sheet_name=district)
 
     # Преобразуем ключи в одномерный список для всех ячеек
     flat_keys = [key for row in keys_table_svod for key in row]
@@ -302,6 +337,7 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
 
     # Создаем словарь
     table_dict = dict(zip(flat_keys, flat_values))
+    print(table_dict)
     table_list = [
         (
             key,
@@ -317,7 +353,9 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
     replacer.write_presentation_to_file(f"{tmp_files_path}/Свод_без_обработки.pptx")
 
     file_path_save_pdf = file_path_save.replace("pptx", "pdf")
-    remove_slides_tinao(f"{tmp_files_path}/Свод_без_обработки.pptx", tinao_len).save(file_path_save)
+    runs_from_pptx_svod(f"{tmp_files_path}/Свод_без_обработки.pptx").save(f"{tmp_files_path}/Свод_без_обработки_крашенный.pptx")
+    remove_slides_tinao(f"{tmp_files_path}/Свод_без_обработки_крашенный.pptx", tinao_len).save(file_path_save)
+
     converted = None
     try:
         converted = convert_pptx_to_pdf(file_path_save, file_path_save_pdf)
