@@ -26,6 +26,7 @@ def make_kvartal_report_excel(file,date):
     df = update_ais_data(df)
     df["Наименование события"] = df["Наименование события КОД ОИВ"]
     df["Округ"] = df["Округ"].astype(str).str.strip()
+    df = df[df["Наименование события"].str.strip().notna()]
     df = df[~df["Округ"].isin(["", "nan", "None"])]
     status_mapping = {"Новое": "В работе", "Отменено": "Закрыто"}
     df["Округ"] = df["Округ"].replace({"НАО": "ТиНАО", "ТАО": "ТиНАО"})
