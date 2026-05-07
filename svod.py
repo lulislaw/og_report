@@ -10,6 +10,7 @@ from openpyxl.drawing.image import Image
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Border, Side
 import comtypes.client
+
 order = ["ЦАО", "САО", "СВАО", "ВАО", "ЮВАО", "ЮАО", "ЮЗАО", "ЗАО", "СЗАО", "ЗелАО", "ТиНАО"]
 
 allert = []
@@ -18,6 +19,8 @@ allert = []
 def fint(x):
     locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
     return locale._format('%d', x, grouping=True)
+
+
 def insert_images_to_excel(image_paths, excel_files):
     print(image_paths, excel_files)
     """Вставляет изображения в Excel, создаёт новый лист с именем файла и ставит его первым"""
@@ -74,11 +77,11 @@ def insert_images_to_excel(image_paths, excel_files):
         excel_app.Quit()
         comtypes.CoUninitialize()
 
-def make_svod_presentation(ais_file, edc_file, date, morning, summer):
-    # Заданный порядок округов
-    order = ["ЦАО", "САО", "СВАО", "ВАО", "ЮВАО", "ЮАО", "ЮЗАО", "ЗАО", "СЗАО", "ЗелАО", "ТиНАО",  'ГБУ "АВД"', "Иные", "Общий итог"]
 
-    # Данные для предыдущего периода
+def make_svod_presentation(ais_file, edc_file, date, morning, summer):
+    order = ["ЦАО", "САО", "СВАО", "ВАО", "ЮВАО", "ЮАО", "ЮЗАО", "ЗАО", "СЗАО", "ЗелАО", "ТиНАО", 'ГБУ "АВД"', "Иные",
+             "Общий итог"]
+
     presentation_maket = "makets/presentation/svod_presentation.pptx"
     if summer:
         presentation_maket = "makets/presentation/svod_presentation-sum.pptx"
@@ -107,7 +110,6 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
     df_edc = pd.read_excel(edc_file)
     df_edc["Округ"] = df_edc["Округ"].replace({"НАО": "ТиНАО", "ТАО": "ТиНАО"})
 
-    # Создаем сводную таблицу
     pivot_table = pd.pivot_table(
         df_ais,
         index=ais_event_name,
@@ -116,55 +118,38 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
         fill_value=0
     )
 
-    # Добавляем итоговые суммы по строкам (справа)
     pivot_table["Итого по строке"] = pivot_table.sum(axis=1)
 
-    # Приводим столбцы к заданному порядку округов
     ordered_columns = [col for col in order if col in pivot_table.columns] + ["Итого по строке"]
     pivot_table = pivot_table[ordered_columns]
-
-    # Копируем оригинальный список для вычисления "Иные"
     original_pivot_table = pivot_table.copy()
 
-    # Сортируем строки по убыванию итогов
     pivot_table_sorted = pivot_table.sort_values(by="Итого по строке", ascending=False)
-
-    # Ограничиваем таблицу до топ-10 строк
     top_10 = pivot_table_sorted.iloc[:10]
 
-    # Добавляем строку "Пуск отопления"
     edc_summary = df_edc["Округ"].value_counts().reindex(order, fill_value=0)
     edc_summary["Итого по строке"] = edc_summary.sum()
     edc_summary.name = "Пуск отопления"
     edc_row = pd.DataFrame(edc_summary).T
 
-    # Объединяем топ-10 с "Пуск отопления" и сортируем снова
     pivot_table_with_heating = pd.concat([top_10, edc_row])
     pivot_table_with_heating = pivot_table_with_heating.sort_values(by="Итого по строке", ascending=False)
 
     remaining_rows = original_pivot_table.drop(index=pivot_table_with_heating.index, errors="ignore")
-    other_row = remaining_rows.sum(axis=0)  # Суммируем оставшиеся строки
+    other_row = remaining_rows.sum(axis=0)
     other_row.name = "Иные"
     pivot_table_with_heating = pd.concat([pivot_table_with_heating, pd.DataFrame([other_row])])
-
-    # Добавляем строку "Итого по столбцу"
     column_sums = pivot_table_with_heating.sum(axis=0)
     column_sums.name = "Итого по столбцу"
     pivot_table_with_heating = pd.concat([pivot_table_with_heating, pd.DataFrame([column_sums])])
 
-    # Приводим порядок столбцов к изначальному
     final_table = pivot_table_with_heating[ordered_columns]
 
-    # Сохраняем результат в Excel на новый лист
     with pd.ExcelWriter(f"{tmp_files_path}/Результаты по своду.xlsx", mode="w", engine="openpyxl") as writer:
         final_table.to_excel(writer, sheet_name="Сводная таблица")
-    # final_table = final_table.reset_index()  # Сбрасываем индекс, чтобы "Наименование события КОД ОИВ" стало колонкой
-
-    # Генерация таблиц по округам с теми же темами
-    top_10_events = final_table.index[:-1]  # Берем те же темы, исключая "Итого по столбцу"
+    top_10_events = final_table.index[:-1]
     tinao_len = 0
     for i, district in enumerate(order):
-        print(f"XYU. {district}")
         if district == "Общий итог":
             continue
         df_district_ais = df_ais[
@@ -232,19 +217,10 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
                 aggfunc="size",
                 fill_value=0,
             )
-            # Оставляем только top-10 событий, даже если по ним пока нет данных
             pivot_table_district = pivot_table_district.reindex(top_10_events, fill_value=0)
-
-            # -----------------------------
-            # Строка "Пуск отопления"
-            # -----------------------------
             edc_summary_district = df_district_edc["Район"].value_counts()
             edc_summary_district.name = "Пуск отопления"
             edc_row_district = pd.DataFrame(edc_summary_district).T
-
-            # -----------------------------
-            # Строка "Иные"
-            # -----------------------------
             df_district_ais_other = df_ais.loc[
                 (df_ais["Округ"] == district) & (~df_ais[ais_event_name].isin(top_10_events)),
                 ["Район"],
@@ -253,13 +229,6 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
             other_summary_district = df_district_ais_other["Район"].value_counts()
             other_summary_district.name = "Иные"
             other_row_district = pd.DataFrame(other_summary_district).T
-
-            # -----------------------------
-            # Собираем полный список районов:
-            # 1. из pivot
-            # 2. из Пуск отопления
-            # 3. из Иные
-            # -----------------------------
             all_districts = list(
                 dict.fromkeys(
                     list(pivot_table_district.columns)
@@ -267,17 +236,9 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
                     + list(other_row_district.columns)
                 )
             )
-
-            # Расширяем pivot новыми районами, если они появились только в "Иные" или "Пуск отопления"
             pivot_table_district = pivot_table_district.reindex(columns=all_districts, fill_value=0)
-
-            # Приводим дополнительные строки к тем же колонкам
             edc_row_district = edc_row_district.reindex(columns=all_districts, fill_value=0)
             other_row_district = other_row_district.reindex(columns=all_districts, fill_value=0)
-
-            # -----------------------------
-            # Добавляем/обновляем строку "Пуск отопления"
-            # -----------------------------
             if "Пуск отопления" not in pivot_table_district.index:
                 pivot_table_district.loc["Пуск отопления"] = 0
 
@@ -285,10 +246,6 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
                     pivot_table_district.loc["Пуск отопления", all_districts]
                     + edc_row_district.loc["Пуск отопления", all_districts]
             )
-
-            # -----------------------------
-            # Добавляем/обновляем строку "Иные"
-            # -----------------------------
             if "Иные" not in pivot_table_district.index:
                 pivot_table_district.loc["Иные"] = 0
 
@@ -296,25 +253,13 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
                     pivot_table_district.loc["Иные", all_districts]
                     + other_row_district.loc["Иные", all_districts]
             )
-
-            # -----------------------------
-            # Итого по строке
-            # -----------------------------
             pivot_table_district["Итого по строке"] = pivot_table_district[all_districts].sum(axis=1)
-
-            # -----------------------------
-            # Итого по столбцу
-            # -----------------------------
             column_sums_district = pivot_table_district.sum(axis=0)
             column_sums_district.name = "Итого по столбцу"
 
             pivot_table_with_heating_district = pd.concat(
                 [pivot_table_district, pd.DataFrame([column_sums_district])]
             )
-
-            # -----------------------------
-            # Подготовка данных для шаблона
-            # -----------------------------
             num_columns = pivot_table_district.shape[1]
 
             letters = ["c", "s", "sv", "v", "yv", "y", "yz", "z", "sz", "ze", "tin"]
@@ -373,13 +318,9 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
             ) as writer:
                 pivot_table_with_heating_district.to_excel(writer, sheet_name=district)
 
-    # Преобразуем ключи в одномерный список для всех ячеек
     flat_keys = [key for row in keys_table_svod for key in row]
     final_table = final_table.reset_index()
-    # Преобразуем данные таблицы в одномерный список
     flat_values = final_table.to_numpy().flatten()
-
-    # Создаем словарь
     table_dict = dict(zip(flat_keys, flat_values))
     print(table_dict)
     table_list = [
@@ -397,7 +338,8 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
     replacer.write_presentation_to_file(f"{tmp_files_path}/Свод_без_обработки.pptx")
 
     file_path_save_pdf = file_path_save.replace("pptx", "pdf")
-    runs_from_pptx_svod(f"{tmp_files_path}/Свод_без_обработки.pptx").save(f"{tmp_files_path}/Свод_без_обработки_крашенный.pptx")
+    runs_from_pptx_svod(f"{tmp_files_path}/Свод_без_обработки.pptx").save(
+        f"{tmp_files_path}/Свод_без_обработки_крашенный.pptx")
     remove_slides_tinao(f"{tmp_files_path}/Свод_без_обработки_крашенный.pptx", tinao_len).save(file_path_save)
 
     converted = None
