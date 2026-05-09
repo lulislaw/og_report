@@ -18,7 +18,7 @@ _last_config = None
 
 def _dbg(msg: str):
     if DEBUG:
-        print(f"[remote] {msg}")
+        print(f".")
 
 
 # ---------- извлечение текста из HTML GitHub ----------

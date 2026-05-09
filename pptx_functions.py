@@ -52,7 +52,6 @@ def format_category_text(category):
 
 
 def update_diagramms(input_path, output_path, diagramms_data):
-    print(diagramms_data, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     comtypes.CoInitialize()  # Инициализация COM (важно!)
     ppt = comtypes.client.CreateObject("PowerPoint.Application")
     ppt.Visible = True  # Можно скрыть, установив False
@@ -105,8 +104,6 @@ def org_diagramm_update(presentation, slide_id, categories, previous_values, cur
 
     # Ищем диаграмму на слайде
     for sh, shape in enumerate(slide.Shapes):
-        if shape.HasChart:
-            print("ShapeID : ", sh)
         if shape.HasChart and sh == shape_id:
             chart = shape.Chart
             workbook = chart.ChartData.Workbook  # Открываем данные диаграммы
@@ -315,7 +312,6 @@ def color_shapes_on_slide(presentation, slide_index):
         shape_colors.append((sh, f"#{random_color[0]:02x}{random_color[1]:02x}{random_color[2]:02x}"))
 
     # Печатаем массив с номерами и цветами
-    print(shape_colors)
     return presentation
 
 
@@ -366,7 +362,6 @@ def find_text_box(pptx_file_path):
             # Проверка, является ли shape текстовым объектом
             if shape.has_text_frame:
                 for i, paragraph in enumerate(shape.text_frame.paragraphs):
-                    print("slide", sl, "shape", s, " Parag", i)
                     for run in paragraph.runs:
                         print(run.text)
 
@@ -562,10 +557,10 @@ def find_text_table(presentation, type_report):
                                     if numbers:
                                         number = numbers[0]
                                         counts_list_row.append((c, number))  # Сохраняем индекс столбца и значение
-                        print(counts_list_row)
+
                         # Используем вашу функцию для определения топ-3 столбцов
                         top_columns = get_top_rows_with_ties(counts_list_row, top_n=3)
-                        print(f"topcollums: {top_columns}")
+
                         # Окрашиваем ячейки с топовыми значениями
                         for c in top_columns:
                             cell = row.cells[c]
@@ -642,10 +637,10 @@ def runs_from_pptx_svod(pptx_file_path):
                                     number = numbers[0]
                                     if number != '0':
                                         counts_list_row.append((c, number))  # Сохраняем индекс столбца и значение
-                    print(counts_list_row)
+
                     # Используем вашу функцию для определения топ-3 столбцов
                     top_columns = get_top_rows_with_ties(counts_list_row, top_n=3)
-                    print(f"topcollums: {top_columns}")
+
                     # Окрашиваем ячейки с топовыми значениями
                     for c in top_columns:
                         cell = row.cells[c]

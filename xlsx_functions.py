@@ -34,10 +34,10 @@ def update_ais_data(df_ais, addresses_file="adresses.xlsx"):
             try:
                 df_ais = drop_random_by_config(df_ais, str(cfg_path), 42)
             except Exception as e:
-                print(f"[skip] drop_random_by_config: {e}")
+                print(f"[skip]")
         return df_ais
     except Exception as e:
-        print(f"Ошибка при обработке файла: {e}")
+        print(f"Ошибка")
         return None
 
 
@@ -51,7 +51,7 @@ def _load_config(config: str | Path | Mapping[str, float]) -> dict[str, float]:
 
     config_path = Path(config)
     if not config_path.is_file():
-        raise FileNotFoundError(f"Config not found: {config_path}")
+        raise FileNotFoundError(f"not found")
 
     with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
@@ -71,7 +71,7 @@ def drop_random_by_config(
         to_drop = []
         for district, frac in cfg.items():
             if not (0 < frac <= 1):
-                raise ValueError(f"Некорректная доля для «{district}»: {frac}")
+                raise ValueError(f"Некорректно")
 
             mask = df["Район"] == district
             if mask.any():
