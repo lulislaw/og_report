@@ -83,35 +83,68 @@ def make_main_keys() -> list[list[str]]:
     ]
 
 
-def generate_table(letter: str, row_length: int, num_rows: int) -> list[list[str]]:
+def generate_table(
+    letter: str,
+    row_length: int,
+    num_rows: int,
+    skip_after_each_column: int = 0,
+) -> list[list[str]]:
     """
     Генерирует таблицу с заданной буквой.
 
-    Пример:
+    Базовый пример:
     generate_table("c", 3, 4)
 
-    Вернет ключи:
-    @c1@, @c4@, @cs1@
-    @c2@, @c5@, @cs2@
-    @c3@, @c6@, @cs3@
+    Вернет:
+    @c1@,  @c4@,  @cs1@
+    @c2@,  @c5@,  @cs2@
+    @c3@,  @c6@,  @cs3@
     @ci1@, @ci2@, @cis@
+
+    Если в шаблоне после каждой обычной колонки есть удалённый/лишний
+    плейсхолдер и нумерация сдвигается на +1, используй:
+
+    generate_table("c", 3, 4, skip_after_each_column=1)
+
+    Тогда будет:
+    @c1@,  @c5@,  @cs1@
+    @c2@,  @c6@,  @cs2@
+    @c3@,  @c7@,  @cs3@
+    @ci1@, @ci2@, @cis@
+
+    Логика:
+    - обычные значения идут по колонкам;
+    - после каждой обычной колонки пропускается skip_after_each_column номеров;
+    - последняя колонка — итоги по строкам: @{letter}s1@, @{letter}s2@...
+    - последняя строка — итоги по колонкам: @{letter}i1@, @{letter}i2@...
+    - нижний правый угол — @{letter}is@.
     """
 
     table = [["" for _ in range(row_length)] for _ in range(num_rows)]
 
     counter = 1
 
+    # Основные ячейки:
+    # все строки кроме последней,
+    # все колонки кроме последней.
     for i in range(row_length - 1):
         for j in range(num_rows - 1):
             table[j][i] = f"@{letter}{counter}@"
             counter += 1
 
+        # Пропуск номеров после каждой обычной колонки.
+        if skip_after_each_column > 0:
+            counter += skip_after_each_column
+
+    # Последняя колонка: итоги по строкам.
     for j in range(num_rows - 1):
         table[j][-1] = f"@{letter}s{j + 1}@"
 
+    # Последняя строка: итоги по колонкам.
     for i in range(row_length - 1):
         table[-1][i] = f"@{letter}i{i + 1}@"
 
+    # Общий итог.
     table[-1][-1] = f"@{letter}is@"
 
     return table

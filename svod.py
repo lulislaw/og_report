@@ -1,7 +1,7 @@
 import pandas as pd
 
 import os
-from str_pptx import generate_table, keys_table_svod_summer
+from str_pptx import generate_table, keys_table_svod_summer, keys_table_svod
 from python_pptx_text_replacer import TextReplacer
 import locale
 from pptx_functions import (
@@ -43,16 +43,119 @@ def format_value(value):
     """
     Безопасное форматирование значений для вставки в pptx.
     """
+    if pd.isna(value):
+        return ""
+
     if isinstance(value, (int, float)) and float(value).is_integer():
         return fint(int(value))
 
     return str(value)
 
 
+def normalize_input_data(df_ais, df_edc, ais_event_name):
+    """
+    Нормализация входных данных.
+    """
+
+    df_ais = df_ais.copy()
+    df_edc = df_edc.copy()
+
+    if "Округ" in df_ais.columns:
+        df_ais["Округ"] = df_ais["Округ"].fillna("").astype(str).str.strip()
+        df_ais["Округ"] = df_ais["Округ"].replace(
+            {
+                "НАО": "ТиНАО",
+                "ТАО": "ТиНАО",
+            }
+        )
+
+    if "Округ" in df_edc.columns:
+        df_edc["Округ"] = df_edc["Округ"].fillna("").astype(str).str.strip()
+        df_edc["Округ"] = df_edc["Округ"].replace(
+            {
+                "НАО": "ТиНАО",
+                "ТАО": "ТиНАО",
+            }
+        )
+
+    if "Район" in df_ais.columns:
+        df_ais["Район"] = df_ais["Район"].fillna("").astype(str).str.strip()
+
+    if "Район" in df_edc.columns:
+        df_edc["Район"] = df_edc["Район"].fillna("").astype(str).str.strip()
+
+    if ais_event_name in df_ais.columns:
+        df_ais[ais_event_name] = (
+            df_ais[ais_event_name]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+        )
+
+    return df_ais, df_edc
+
+
+def check_pptx_mapping(label, flat_keys, flat_values):
+    """
+    Диагностика перед вставкой в pptx.
+    """
+    global allert
+
+    print(
+        label,
+        "keys:",
+        len(flat_keys),
+        "values:",
+        len(flat_values),
+        "unique keys:",
+        len(set(flat_keys)),
+    )
+
+    if len(flat_keys) != len(flat_values):
+        allert.append(
+            f"Ошибка PPTX [{label}]: ключей {len(flat_keys)}, "
+            f"значений {len(flat_values)}. Данные могут вставиться неправильно."
+        )
+
+    if len(flat_keys) != len(set(flat_keys)):
+        allert.append(
+            f"Ошибка PPTX [{label}]: есть повторяющиеся ключи. "
+            f"Часть значений может быть перезатёрта."
+        )
+
+
+def make_header_values_for_district_slide(streets, keys_count):
+    """
+    Формирует значения для заголовков районов.
+
+    В макете заголовки районов сделаны в 2 строки:
+    - первая строка: районы + Итого
+    - вторая строка: пустые значения
+
+    Поэтому количество значений должно совпадать с количеством ключей.
+    """
+
+    first_row = list(streets) + ["Итого"]
+    second_row = [""] * len(first_row)
+
+    values = first_row + second_row
+
+    if len(values) < keys_count:
+        values += [""] * (keys_count - len(values))
+
+    if len(values) > keys_count:
+        values = values[:keys_count]
+
+    return values
+
+
 def insert_images_to_excel(image_paths, excel_files):
     print(image_paths, excel_files)
 
-    """Вставляет изображения в Excel, создаёт новый лист с именем файла и ставит его первым"""
+    """
+    Вставляет изображения в Excel, создаёт новый лист с именем файла
+    и ставит его первым.
+    """
 
     if len(image_paths) < len(excel_files) + 1:
         print("Ошибка: Слишком мало слайдов для всех файлов Excel")
@@ -79,6 +182,8 @@ def insert_images_to_excel(image_paths, excel_files):
         wb.move_sheet(ws, offset=-len(wb.sheetnames) + 1)
 
         wb.save(excel_path)
+        wb.close()
+
         print(f"Обновлён файл Excel: {excel_path}, вставлен {img_path}")
 
     comtypes.CoInitialize()
@@ -158,8 +263,8 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
 
     path_os = f"reports/{date_text}".replace(":", ".")
 
-    if not os.path.exists(f"{path_os}/Сводка"):
-        os.makedirs(f"{path_os}/Сводка")
+    os.makedirs(f"{path_os}/Сводка", exist_ok=True)
+    os.makedirs(tmp_files_path, exist_ok=True)
 
     f_time = "17:00"
     f_date = date
@@ -187,11 +292,10 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
     df_ais = pd.read_excel(ais_file)
     df_edc = pd.read_excel(edc_file)
 
-    df_edc["Округ"] = df_edc["Округ"].replace(
-        {
-            "НАО": "ТиНАО",
-            "ТАО": "ТиНАО",
-        }
+    df_ais, df_edc = normalize_input_data(
+        df_ais=df_ais,
+        df_edc=df_edc,
+        ais_event_name=ais_event_name,
     )
 
     # =========================
@@ -223,12 +327,6 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
 
     top_10 = pivot_table_sorted.iloc[:10]
 
-    # ==================================================
-    # ВАЖНО:
-    # "Пуск отопления" добавляем только НЕ летом.
-    # При summer=True он вообще не должен попадать в свод.
-    # ==================================================
-
     if not summer:
         edc_summary = df_edc["Округ"].value_counts().reindex(order, fill_value=0)
         edc_summary["Итого по строке"] = edc_summary.sum()
@@ -250,7 +348,6 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
         errors="ignore",
     )
 
-    # "Иные" добавляем всегда
     other_row = remaining_rows.sum(axis=0)
     other_row.name = "Иные"
 
@@ -273,17 +370,14 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
 
     final_table = pivot_table_with_heating[ordered_columns]
 
+    result_svod_path = f"{tmp_files_path}/Результаты по своду.xlsx"
+
     with pd.ExcelWriter(
-        f"{tmp_files_path}/Результаты по своду.xlsx",
+        result_svod_path,
         mode="w",
         engine="openpyxl",
     ) as writer:
         final_table.to_excel(writer, sheet_name="Сводная таблица")
-
-    # ==================================================
-    # Список тем для районных слайдов.
-    # Исключаем служебные строки.
-    # ==================================================
 
     top_10_events = [
         event
@@ -328,7 +422,12 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
             "Дата создания во внешней системе",
         ]
 
-        df_district_ais_for_xl = df_district_ais_xl[selected_columns].copy()
+        existing_columns = [
+            col for col in selected_columns
+            if col in df_district_ais_xl.columns
+        ]
+
+        df_district_ais_for_xl = df_district_ais_xl[existing_columns].copy()
 
         df_district_ais_for_xl.loc[:, "Статус"] = ""
         df_district_ais_for_xl.loc[:, "Примечание"] = ""
@@ -411,7 +510,6 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
 
         print(f"{district}")
 
-        # Лист ЕДЦ добавляем только НЕ летом
         if not summer:
             with pd.ExcelWriter(
                 xlsx_path,
@@ -419,7 +517,11 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
                 engine="openpyxl",
                 if_sheet_exists="replace",
             ) as writer:
-                df_district_edc.to_excel(writer, sheet_name="ЕДЦ")
+                df_district_edc.to_excel(
+                    writer,
+                    sheet_name="ЕДЦ",
+                    index=False,
+                )
 
         if district == 'ГБУ "АВД"' or district == "Иные":
             print(f"{district} не рисует слайд")
@@ -442,7 +544,6 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
             fill_value=0,
         )
 
-        # "Иные" по району/округу
         df_district_ais_other = df_ais.loc[
             (df_ais["Округ"] == district)
             & (~df_ais[ais_event_name].isin(top_10_events)),
@@ -453,10 +554,6 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
         other_summary_district.name = "Иные"
 
         other_row_district = pd.DataFrame(other_summary_district).T
-
-        # ==================================================
-        # "Пуск отопления" в районной таблице только НЕ летом.
-        # ==================================================
 
         if not summer:
             edc_summary_district = df_district_edc["Район"].value_counts()
@@ -480,6 +577,11 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
                     + list(other_row_district.columns)
                 )
             )
+
+        all_districts = [
+            x for x in all_districts
+            if str(x).strip() not in ["", "nan", "None"]
+        ]
 
         pivot_table_district = pivot_table_district.reindex(
             columns=all_districts,
@@ -505,7 +607,6 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
                 + edc_row_district.loc["Пуск отопления", all_districts]
             )
 
-        # "Иные" добавляем всегда
         if "Иные" not in pivot_table_district.index:
             pivot_table_district.loc["Иные"] = 0
 
@@ -571,10 +672,12 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
                 allert.append(f"Внимание! У {district} меньше районов!")
             elif num_columns > row_len[i]:
                 allert.append(f"Внимание! У {district} больше районов!")
+
         if not summer:
             keys_district = generate_table(letter, num_columns, 13)
         else:
-            keys_district = generate_table(letter, num_columns, 12)
+            keys_district = generate_table(letter, num_columns, 12, 1)
+
         flat_keys = [
             key
             for row in keys_district
@@ -582,6 +685,12 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
         ]
 
         flat_values = pivot_table_with_heating_district.to_numpy().flatten()
+
+        check_pptx_mapping(
+            f"районная таблица {district}",
+            flat_keys,
+            flat_values,
+        )
 
         table_dict = dict(zip(flat_keys, flat_values))
 
@@ -592,6 +701,10 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
             )
             for key, value in table_dict.items()
         ]
+
+        # =========================
+        # Заголовки районов для слайда
+        # =========================
 
         streets = list(pivot_table_with_heating_district.columns[:-1])
 
@@ -607,7 +720,18 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
             for key in row
         ]
 
-        s_dict = dict(zip(s_flat_keys, streets))
+        s_flat_values = make_header_values_for_district_slide(
+            streets=streets,
+            keys_count=len(s_flat_keys),
+        )
+
+        check_pptx_mapping(
+            f"заголовки районов {district}",
+            s_flat_keys,
+            s_flat_values,
+        )
+
+        s_dict = dict(zip(s_flat_keys, s_flat_values))
 
         s_table_list = [
             (
@@ -621,9 +745,10 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
         replacer.replace_text(s_table_list)
 
         with pd.ExcelWriter(
-            f"{tmp_files_path}/Результаты по своду.xlsx",
+            result_svod_path,
             mode="a",
             engine="openpyxl",
+            if_sheet_exists="replace",
         ) as writer:
             pivot_table_with_heating_district.to_excel(
                 writer,
@@ -634,15 +759,28 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
     # Заполнение общей таблицы в pptx
     # =========================
 
-    flat_keys = [
-        key
-        for row in keys_table_svod_summer
-        for key in row
-    ]
+    if summer:
+        flat_keys = [
+            key
+            for row in keys_table_svod_summer
+            for key in row
+        ]
+    else:
+        flat_keys = [
+            key
+            for row in keys_table_svod
+            for key in row
+        ]
 
     final_table = final_table.reset_index()
 
     flat_values = final_table.to_numpy().flatten()
+
+    check_pptx_mapping(
+        "главная таблица",
+        flat_keys,
+        flat_values,
+    )
 
     table_dict = dict(zip(flat_keys, flat_values))
 
@@ -673,20 +811,17 @@ def make_svod_presentation(ais_file, edc_file, date, morning, summer):
         .replace(":", ".")
     )
 
-    replacer.write_presentation_to_file(
-        f"{tmp_files_path}/Свод_без_обработки.pptx"
-    )
+    raw_pptx_path = f"{tmp_files_path}/Свод_без_обработки.pptx"
+    colored_pptx_path = f"{tmp_files_path}/Свод_без_обработки_крашенный.pptx"
+
+    replacer.write_presentation_to_file(raw_pptx_path)
 
     file_path_save_pdf = file_path_save.replace("pptx", "pdf")
 
-    runs_from_pptx_svod(
-        f"{tmp_files_path}/Свод_без_обработки.pptx"
-    ).save(
-        f"{tmp_files_path}/Свод_без_обработки_крашенный.pptx"
-    )
+    runs_from_pptx_svod(raw_pptx_path).save(colored_pptx_path)
 
     remove_slides_tinao(
-        f"{tmp_files_path}/Свод_без_обработки_крашенный.pptx",
+        colored_pptx_path,
         tinao_len,
     ).save(file_path_save)
 
