@@ -1,0 +1,87 @@
+# ==========================================
+# Базовые файлы Python (Компиляция и кэш)
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C-расширения
+*.so
+
+# Распределенные пакеты / Сборка (Build)
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Пакетные менеджеры и зависимости
+# Рекомендуется фиксировать lock-файлы (Pipfile.lock, poetry.lock), но игнорировать рабочие каталоги
+.pdm-python
+.venv
+venv/
+ENV/
+env/
+ENV*/
+
+# ==========================================
+# Настройки популярных сред разработки (IDEs)
+# ==========================================
+# PyCharm / IntelliJ IDEA
+.idea/
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Jupyter Notebook (Кэш и контрольные точки)
+.ipynb_checkpoints
+
+# ==========================================
+# Тестирование, качество кода и покрытие
+# ==========================================
+.htmlcov/
+.tox/
+.nosexy/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ==========================================
+# Локальные переменные окружения и логи
+# ==========================================
+.env
+.env.*
+*.log
+local_settings.py
+db.sqlite3
+*.xlsx
+/month
+/reports
+/resource/config.yaml
+GUI.spec
